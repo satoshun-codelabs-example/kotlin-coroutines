@@ -28,30 +28,30 @@ import org.junit.runners.JUnit4
 @RunWith(JUnit4::class)
 class MainViewModelTest {
 
-    /**
-     * In this test, LiveData will immediately post values without switching threads.
-     */
-    @get:Rule
-    val instantTaskExecutorRule = InstantTaskExecutorRule()
+  /**
+   * In this test, LiveData will immediately post values without switching threads.
+   */
+  @get:Rule
+  val instantTaskExecutorRule = InstantTaskExecutorRule()
 
-    lateinit var subject: MainViewModel
+  lateinit var subject: MainViewModel
 
-    /**
-     * Before the test runs initialize subject
-     */
-    @Before
-    fun setup() {
-        subject = MainViewModel()
+  /**
+   * Before the test runs initialize subject
+   */
+  @Before
+  fun setup() {
+    subject = MainViewModel()
+  }
+
+  @Test
+  fun whenMainViewModelClicked_showSnackbar() {
+    runBlocking {
+      subject.snackbar.captureValues {
+        subject.onMainViewClicked()
+        assertSendsValues(2_000, "Hello, from coroutines!")
+      }
     }
-
-    @Test
-    fun whenMainViewModelClicked_showSnackbar() {
-        runBlocking {
-            subject.snackbar.captureValues {
-                subject.onMainViewClicked()
-                assertSendsValues(2_000, "Hello, from threads!")
-            }
-        }
-    }
+  }
 }
 
