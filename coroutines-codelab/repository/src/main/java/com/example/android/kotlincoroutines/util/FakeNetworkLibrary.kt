@@ -18,8 +18,11 @@ package com.example.android.kotlincoroutines.util
 
 import android.os.Handler
 import android.os.Looper
-import java.util.*
+import java.util.Random
 import java.util.concurrent.Executors
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
+import kotlin.coroutines.suspendCoroutine
 
 /**
  * This file contains a completely fake networking library that returns a random value after
@@ -51,28 +54,28 @@ private val uiHandler = Handler(Looper.getMainLooper())
  * A completely fake network library that returns from a given list of strings or an error.
  */
 fun fakeNetworkLibrary(from: List<String>): FakeNetworkCall<String> {
-    assert(from.isNotEmpty()) { "You must pass at least one result string" }
-    val result = FakeNetworkCall<String>()
+  assert(from.isNotEmpty()) { "You must pass at least one result string" }
+  val result = FakeNetworkCall<String>()
 
-    // Launch the "network request" in a new thread to avoid blocking the calling thread
-    executor.submit {
-        Thread.sleep(ONE_SECOND) // pretend we actually made a network request by sleeping
+  // Launch the "network request" in a new thread to avoid blocking the calling thread
+  executor.submit {
+    Thread.sleep(ONE_SECOND) // pretend we actually made a network request by sleeping
 
-        // pretend we got a result from the passed list, or randomly an error
-        if (DefaultErrorDecisionStrategy.shouldError()) {
-            result.onError(FakeNetworkException("Error contacting the network"))
-        } else {
-            result.onSuccess(from[Random().nextInt(from.size)])
-        }
+    // pretend we got a result from the passed list, or randomly an error
+    if (DefaultErrorDecisionStrategy.shouldError()) {
+      result.onError(FakeNetworkException("Error contacting the network"))
+    } else {
+      result.onSuccess(from[Random().nextInt(from.size)])
     }
-    return result
+  }
+  return result
 }
 
 /**
  * Error decision strategy is used to decide if an error should be returned by the fake request
  */
 interface ErrorDecisionStrategy {
-    fun shouldError(): Boolean
+  fun shouldError(): Boolean
 }
 
 /**
@@ -80,73 +83,73 @@ interface ErrorDecisionStrategy {
  * tests
  */
 object DefaultErrorDecisionStrategy : ErrorDecisionStrategy {
-    var delegate: ErrorDecisionStrategy = RandomErrorStrategy
+  var delegate: ErrorDecisionStrategy = RandomErrorStrategy
 
-    override fun shouldError() = delegate.shouldError()
+  override fun shouldError() = delegate.shouldError()
 }
 
 /**
  * Random error decision strategy uses random to return error randomly
  */
 object RandomErrorStrategy : ErrorDecisionStrategy {
-    override fun shouldError() = Random().nextFloat() < ERROR_RATE
+  override fun shouldError() = Random().nextFloat() < ERROR_RATE
 }
 
 /**
  * Fake Call for our network library used to observe results
  */
 class FakeNetworkCall<T> {
-    var result: FakeNetworkResult<T>? = null
+  var result: FakeNetworkResult<T>? = null
 
-    val listeners = mutableListOf<FakeNetworkListener<T>>()
+  val listeners = mutableListOf<FakeNetworkListener<T>>()
 
-    /**
-     * Register a result listener to observe this callback.
-     *
-     * Errors will be passed to this callback as an instance of [FakeNetworkError] and successful
-     * calls will be passed to this callback as an instance of [FakeNetworkSuccess].
-     *
-     * @param listener the callback to call when this request completes
-     */
-    fun addOnResultListener(listener: (FakeNetworkResult<T>) -> Unit) {
-        trySendResult(listener)
-        listeners += listener
+  /**
+   * Register a result listener to observe this callback.
+   *
+   * Errors will be passed to this callback as an instance of [FakeNetworkError] and successful
+   * calls will be passed to this callback as an instance of [FakeNetworkSuccess].
+   *
+   * @param listener the callback to call when this request completes
+   */
+  fun addOnResultListener(listener: (FakeNetworkResult<T>) -> Unit) {
+    trySendResult(listener)
+    listeners += listener
+  }
+
+  /**
+   * The library will call this when a result is available
+   */
+  fun onSuccess(data: T) {
+    result = FakeNetworkSuccess(data)
+    sendResultToAllListeners()
+  }
+
+  /**
+   * The library will call this when an error happens
+   */
+  fun onError(throwable: Throwable) {
+    result = FakeNetworkError(throwable)
+    sendResultToAllListeners()
+  }
+
+  /**
+   * Broadcast the current result (success or error) to all registered listeners.
+   */
+  private fun sendResultToAllListeners() = listeners.map { trySendResult(it) }
+
+  /**
+   * Send the current result to a specific listener.
+   *
+   * If no result is set (null), this method will do nothing.
+   */
+  private fun trySendResult(listener: FakeNetworkListener<T>) {
+    val thisResult = result
+    thisResult?.let {
+      uiHandler.post {
+        listener(thisResult)
+      }
     }
-
-    /**
-     * The library will call this when a result is available
-     */
-    fun onSuccess(data: T) {
-        result = FakeNetworkSuccess(data)
-        sendResultToAllListeners()
-    }
-
-    /**
-     * The library will call this when an error happens
-     */
-    fun onError(throwable: Throwable) {
-        result = FakeNetworkError(throwable)
-        sendResultToAllListeners()
-    }
-
-    /**
-     * Broadcast the current result (success or error) to all registered listeners.
-     */
-    private fun sendResultToAllListeners() = listeners.map { trySendResult(it) }
-
-    /**
-     * Send the current result to a specific listener.
-     *
-     * If no result is set (null), this method will do nothing.
-     */
-    private fun trySendResult(listener: FakeNetworkListener<T>) {
-        val thisResult = result
-        thisResult?.let {
-            uiHandler.post {
-                listener(thisResult)
-            }
-        }
-    }
+  }
 }
 
 /**
@@ -177,3 +180,14 @@ typealias FakeNetworkListener<T> = (FakeNetworkResult<T>) -> Unit
  * Throwable to use in fake network errors.
  */
 class FakeNetworkException(message: String) : Throwable(message)
+
+suspend fun <T> FakeNetworkCall<T>.await(): T {
+  return suspendCoroutine { continuation ->
+    addOnResultListener { result ->
+      when (result) {
+        is FakeNetworkSuccess<T> -> continuation.resume(result.data)
+        is FakeNetworkError -> continuation.resumeWithException(result.error)
+      }
+    }
+  }
+}
