@@ -39,38 +39,38 @@ import kotlin.coroutines.suspendCoroutine
  */
 class TitleRepository(val network: MainNetwork, val titleDao: TitleDao) {
 
-    /**
-     * [LiveData] to load title.
-     *
-     * This is the main interface for loading a title. The title will be loaded from the offline
-     * cache.
-     *
-     * Observing this will not cause the title to be refreshed, use [TitleRepository.refreshTitle]
-     * to refresh the title.
-     *
-     * Because this is defined as `by lazy` it won't be instantiated until the property is
-     * used for the first time.
-     */
-    val title: LiveData<String> by lazy<LiveData<String>>(NONE) {
-        Transformations.map(titleDao.loadTitle()) { it?.title }
-    }
+  /**
+   * [LiveData] to load title.
+   *
+   * This is the main interface for loading a title. The title will be loaded from the offline
+   * cache.
+   *
+   * Observing this will not cause the title to be refreshed, use [TitleRepository.refreshTitle]
+   * to refresh the title.
+   *
+   * Because this is defined as `by lazy` it won't be instantiated until the property is
+   * used for the first time.
+   */
+  val title: LiveData<String> by lazy<LiveData<String>>(NONE) {
+    Transformations.map(titleDao.loadTitle()) { it?.title }
+  }
 
-    /**
-     * Refresh the current title and save the results to the offline cache.
-     *
-     * This method does not return the new title. Use [TitleRepository.title] to observe
-     * the current tile.
-     */
-    suspend fun refreshTitle() {
-        withContext(Dispatchers.IO) {
-            try {
-                val result = network.fetchNewWelcome().await()
-                titleDao.insertTitle(Title(result))
-            } catch (error: FakeNetworkException) {
-                throw TitleRefreshError(error)
-            }
-        }
+  /**
+   * Refresh the current title and save the results to the offline cache.
+   *
+   * This method does not return the new title. Use [TitleRepository.title] to observe
+   * the current tile.
+   */
+  suspend fun refreshTitle() {
+    withContext(Dispatchers.IO) {
+      try {
+        val result = network.fetchNewWelcome().await()
+        titleDao.insertTitle(Title(result))
+      } catch (error: FakeNetworkException) {
+        throw TitleRefreshError(error)
+      }
     }
+  }
 }
 
 /**
@@ -88,12 +88,12 @@ class TitleRefreshError(cause: Throwable) : Throwable(cause.message, cause)
  * @throws Throwable original exception from library if network request fails
  */
 suspend fun <T> FakeNetworkCall<T>.await(): T {
-    return suspendCoroutine { continuation ->
-        addOnResultListener { result ->
-            when (result) {
-                is FakeNetworkSuccess<T> -> continuation.resume(result.data)
-                is FakeNetworkError -> continuation.resumeWithException(result.error)
-            }
-        }
+  return suspendCoroutine { continuation ->
+    addOnResultListener { result ->
+      when (result) {
+        is FakeNetworkSuccess<T> -> continuation.resume(result.data)
+        is FakeNetworkError -> continuation.resumeWithException(result.error)
+      }
     }
+  }
 }

@@ -31,26 +31,26 @@ import org.junit.runners.JUnit4
 
 @RunWith(JUnit4::class)
 class RefreshMainDataWorkTest {
-    private lateinit var context: Context
+  private lateinit var context: Context
 
-    @Before
-    fun setup() {
-        context = ApplicationProvider.getApplicationContext()
+  @Before
+  fun setup() {
+    context = ApplicationProvider.getApplicationContext()
 
-        DefaultErrorDecisionStrategy.delegate =
-                object: ErrorDecisionStrategy {
-                            override fun shouldError() = false
-                        }
-    }
+    DefaultErrorDecisionStrategy.delegate =
+      object : ErrorDecisionStrategy {
+        override fun shouldError() = false
+      }
+  }
 
-    @Test
-    fun testRefreshMainDataWork() {
-        // Get the ListenableWorker
-        val worker = TestListenableWorkerBuilder<RefreshMainDataWork>(context).build()
+  @Test
+  fun testRefreshMainDataWork() {
+    // Get the ListenableWorker
+    val worker = TestListenableWorkerBuilder<RefreshMainDataWork>(context).build()
 
-        // Start the work synchronously
-        val result = worker.startWork().get()
+    // Start the work synchronously
+    val result = worker.startWork().get()
 
-        assertThat(result, `is`(Result.success()))
-    }
+    assertThat(result, `is`(Result.success()))
+  }
 }
